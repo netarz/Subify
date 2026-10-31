@@ -123,6 +123,7 @@ Current providers include:
 - Google Gemini
 - OpenRouter
 - OpenAI
+- Gisoo
 
 ### 🌍 Multilingual content
 
@@ -201,6 +202,7 @@ Subify uses a provider-based architecture so users can choose and configure the 
 | Google Gemini | Translation and live AI capabilities |
 | OpenRouter | Text translation through supported models |
 | OpenAI | Text translation through the OpenAI API |
+| Gisoo | Text translation through the OpenAI-compatible API at [gisoo.pro](https://gisoo.pro/?utm_source=github&utm_medium=referral&utm_campaign=subify), one key and 400+ models; paste the key in the popup's Keys tab |
 
 > **Bring your own API key:** Subify is designed around credentials provided and configured by the user.
 

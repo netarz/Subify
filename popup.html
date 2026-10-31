@@ -122,7 +122,7 @@ footer{background:rgba(7,10,15,.9)!important;border-top:1px solid rgba(255,255,2
     </section>
     <div class="provider-card">
       <div class="provider-head"><span class="section-title">موتور ترجمه <span class="hint">برای همین ویدیو</span></span><span id="providerBadge" class="provider-badge">Auto</span></div>
-      <div class="provider-select"><select id="popup-provider"><option value="auto">خودکار</option><option value="gemini">Gemini</option><option value="openrouter">OpenRouter</option><option value="openai">OpenAI</option></select></div>
+      <div class="provider-select"><select id="popup-provider"><option value="auto">خودکار</option><option value="gemini">Gemini</option><option value="openrouter">OpenRouter</option><option value="openai">OpenAI</option><option value="gisoo">Gisoo</option></select></div>
       <div id="providerHint" class="status" style="margin-top:8px">در حالت خودکار، سرویس دارای کلید معتبر انتخاب می‌شود.</div>
       <div class="provider-model-row" style="margin-top:8px;display:grid;grid-template-columns:1fr;gap:7px">
         <label for="popup-provider-model" class="hint" style="font-size:10px">مدل این Provider</label>
@@ -182,9 +182,10 @@ footer{background:rgba(7,10,15,.9)!important;border-top:1px solid rgba(255,255,2
   <section class="tab-panel" data-panel="keys">
     <div class="key-card"><label>Gemini API Key</label><input id="popup-gemini-key" type="password" placeholder="کلید Gemini"></div>
     <div class="key-card"><label>OpenRouter API Key</label><input id="popup-openrouter-key" type="password" placeholder="کلید OpenRouter"></div>
+    <div class="key-card"><label>Gisoo API Key</label><input id="gisooKey" type="password" placeholder="sk-gisoo-v1-..." autocomplete="off"></div><div class="key-card"><label>Gisoo Model</label><input id="gisooModel" type="text" value="gemini-3.1-flash-lite" placeholder="gemini-3.1-flash-lite" autocomplete="off"></div>
     <div class="key-card"><label>OpenAI API Key</label><input id="openaiKey" type="password" placeholder="sk-..." autocomplete="off"></div><div class="key-card"><label>OpenAI Model</label><input id="openaiModel" type="text" value="gpt-5.6-luna" placeholder="gpt-5.6-luna" autocomplete="off"></div>
 <div class="key-actions"><button id="saveKeys">ذخیره کلیدها</button></div>
-    <div class="key-tests"><button id="testGemini">تست Gemini</button><button id="testOpenRouter">تست OpenRouter</button><button id="testOpenAI">تست OpenAI</button></div>
+    <div class="key-tests"><button id="testGemini">تست Gemini</button><button id="testOpenRouter">تست OpenRouter</button><button id="testOpenAI">تست OpenAI</button><button id="testGisoo">تست Gisoo</button></div>
     <div id="keyStatus" class="status">کلیدها ذخیره و از تنظیمات اصلی خوانده می‌شوند.</div>
   </section>
 </main>

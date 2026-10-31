@@ -239,14 +239,14 @@ $("captureShot")?.addEventListener("click",async()=>{const tab=await activeTab()
     updateProviderUi($('popup-provider').value, pd_settings);
   }
   function updateProviderUi(v,pd={}){
-    const labels={auto:'خودکار',gemini:'Gemini',openrouter:'OpenRouter',openai:'OpenAI'};
+    const labels={auto:'خودکار',gemini:'Gemini',openrouter:'OpenRouter',openai:'OpenAI',gisoo:'Gisoo'};
     if($('providerBadge'))$('providerBadge').textContent=labels[v]||'خودکار';
-    if($('providerHint'))$('providerHint').textContent=v==='auto'?'خودکار: اول OpenRouter، سپس OpenAI و بعد Gemini؛ فقط سرویسی که کلید دارد استفاده می‌شود.':`موتور انتخاب‌شده: ${labels[v]||v}. فقط همان سرویس برای ترجمه استفاده می‌شود.`;
+    if($('providerHint'))$('providerHint').textContent=v==='auto'?'خودکار: اول OpenRouter، سپس OpenAI، بعد Gisoo و بعد Gemini؛ فقط سرویسی که کلید دارد استفاده می‌شود.':`موتور انتخاب‌شده: ${labels[v]||v}. فقط همان سرویس برای ترجمه استفاده می‌شود.`;
     const input=$('popup-provider-model'), select=$('popup-gemini-models'), hint=$('providerModelHint');
     if(!input||!select)return;
-    const isGemini=v==='gemini', isOR=v==='openrouter', isOAI=v==='openai';
+    const isGemini=v==='gemini', isOR=v==='openrouter', isOAI=v==='openai', isGisoo=v==='gisoo';
     select.style.display=isGemini?'block':'none'; input.style.display=isGemini?'none':'block';
-    if(hint) hint.textContent=isGemini?'یک مدل generateContent از Gemini انتخاب کن. در صورت وجود مدل‌های کشف‌شده این فهرست خودکار پر می‌شود.':isOR?'مدل OpenRouter را می‌توانی دقیقاً دستی تعیین کنی. پیش‌فرض: openrouter/free':isOAI?'مدل OpenAI را دستی وارد کن؛ انتخاب فقط برای ترجمه زیرنویس اعمال می‌شود.':'در حالت Auto، مدل ذخیره‌شده‌ی هر Provider استفاده می‌شود.';
+    if(hint) hint.textContent=isGemini?'یک مدل generateContent از Gemini انتخاب کن. در صورت وجود مدل‌های کشف‌شده این فهرست خودکار پر می‌شود.':isOR?'مدل OpenRouter را می‌توانی دقیقاً دستی تعیین کنی. پیش‌فرض: openrouter/free':isOAI?'مدل OpenAI را دستی وارد کن؛ انتخاب فقط برای ترجمه زیرنویس اعمال می‌شود.':isGisoo?'شناسه مدل گیسو را وارد کن (فهرست مدل‌ها: gisoo.pro/api/v1/models). پیش‌فرض: gemini-3.1-flash-lite':'در حالت Auto، مدل ذخیره‌شده‌ی هر Provider استفاده می‌شود.';
     if(isGemini){
       const val=pd.geminiSubtitleModel||pd.geminiModel||pd.sttModel||'gemini-3.1-flash-lite';
       select.innerHTML='';
@@ -256,7 +256,7 @@ $("captureShot")?.addEventListener("click",async()=>{const tab=await activeTab()
       uniq.forEach(id=>{const o=document.createElement('option');o.value=id;o.textContent=id;select.appendChild(o);});
       select.value=val;
     } else {
-      input.value=isOR?(pd.openRouterModel||'openrouter/free'):isOAI?(pd.openaiModel||'gpt-5.6-luna'):(pd.sttModel||'gemini-3.1-flash-lite');
+      input.value=isOR?(pd.openRouterModel||'openrouter/free'):isOAI?(pd.openaiModel||'gpt-5.6-luna'):isGisoo?(pd.gisooModel||'gemini-3.1-flash-lite'):(pd.sttModel||'gemini-3.1-flash-lite');
       input.dataset.provider=v;
     }
   }
@@ -265,12 +265,13 @@ $("captureShot")?.addEventListener("click",async()=>{const tab=await activeTab()
   $('subify-tab-karaoke')?.addEventListener('change',async e=>{const {subify_settings={}}=await chrome.storage.local.get('subify_settings');await chrome.storage.local.set({subify_settings:{...subify_settings,karaokeEnabled:e.target.checked}});});
   $('tab-source-language')?.addEventListener('change',async e=>{const {subify_settings={}}=await chrome.storage.local.get('subify_settings');await chrome.storage.local.set({subify_settings:{...subify_settings,sourceLanguage:e.target.value}});});
   $('popup-provider')?.addEventListener('change',async e=>{const {pd_settings={}}=await chrome.storage.local.get('pd_settings');const next={...pd_settings,subtitleProvider:e.target.value};await chrome.storage.local.set({pd_settings:next});updateProviderUi(e.target.value,next);});
-  $('popup-provider-model')?.addEventListener('change',async e=>{const {pd_settings={}}=await chrome.storage.local.get('pd_settings');const provider=e.target.dataset.provider||$('popup-provider').value;const value=e.target.value.trim();const patch=provider==='openrouter'?{openRouterModel:value||'openrouter/free'}:provider==='openai'?{openaiModel:value||'gpt-5.6-luna'}:{sttModel:value||'gemini-3.1-flash-lite',geminiSubtitleModel:value||'gemini-3.1-flash-lite'};await chrome.storage.local.set({pd_settings:{...pd_settings,...patch}});});
+  $('popup-provider-model')?.addEventListener('change',async e=>{const {pd_settings={}}=await chrome.storage.local.get('pd_settings');const provider=e.target.dataset.provider||$('popup-provider').value;const value=e.target.value.trim();const patch=provider==='openrouter'?{openRouterModel:value||'openrouter/free'}:provider==='openai'?{openaiModel:value||'gpt-5.6-luna'}:provider==='gisoo'?{gisooModel:value||'gemini-3.1-flash-lite'}:{sttModel:value||'gemini-3.1-flash-lite',geminiSubtitleModel:value||'gemini-3.1-flash-lite'};await chrome.storage.local.set({pd_settings:{...pd_settings,...patch}});});
   $('popup-gemini-models')?.addEventListener('change',async e=>{const {pd_settings={}}=await chrome.storage.local.get('pd_settings');const value=e.target.value;await chrome.storage.local.set({pd_settings:{...pd_settings,sttModel:value,geminiSubtitleModel:value}});});
 
-  async function loadPopupKeys(){const {pd_settings={}}=await chrome.storage.local.get('pd_settings');$('popup-gemini-key').value=pd_settings.apiKey||'';$('popup-openrouter-key').value=pd_settings.openRouterKey||'';$('openaiKey').value=pd_settings.openaiKey||'';$('openaiModel').value=pd_settings.openaiModel||'gpt-5.6-luna';}
-  $('saveKeys')?.addEventListener('click',async()=>{const {pd_settings={}}=await chrome.storage.local.get('pd_settings');await chrome.storage.local.set({pd_settings:{...pd_settings,apiKey:$('popup-gemini-key').value.trim(),openRouterKey:$('popup-openrouter-key').value.trim(),openaiKey:$('openaiKey').value.trim(),openaiModel:$('openaiModel').value.trim()||'gpt-5.6-luna'}});$('keyStatus').textContent='کلیدها ذخیره شدند ✓';});
+  async function loadPopupKeys(){const {pd_settings={}}=await chrome.storage.local.get('pd_settings');$('popup-gemini-key').value=pd_settings.apiKey||'';$('popup-openrouter-key').value=pd_settings.openRouterKey||'';$('openaiKey').value=pd_settings.openaiKey||'';$('openaiModel').value=pd_settings.openaiModel||'gpt-5.6-luna';$('gisooKey').value=pd_settings.gisooKey||'';$('gisooModel').value=pd_settings.gisooModel||'gemini-3.1-flash-lite';}
+  $('saveKeys')?.addEventListener('click',async()=>{const {pd_settings={}}=await chrome.storage.local.get('pd_settings');await chrome.storage.local.set({pd_settings:{...pd_settings,apiKey:$('popup-gemini-key').value.trim(),openRouterKey:$('popup-openrouter-key').value.trim(),openaiKey:$('openaiKey').value.trim(),openaiModel:$('openaiModel').value.trim()||'gpt-5.6-luna',gisooKey:$('gisooKey').value.trim(),gisooModel:$('gisooModel').value.trim()||'gemini-3.1-flash-lite'}});$('keyStatus').textContent='کلیدها ذخیره شدند ✓';});
   $('testGemini')?.addEventListener('click',async()=>{const r=await chrome.runtime.sendMessage({type:'subify-test-key'}).catch(e=>({ok:false,error:e.message}));$('keyStatus').textContent=r?.ok?`Gemini متصل است • ${r.model||''}`:(r?.error||'کلید Gemini معتبر نیست یا هنوز تنظیم نشده است.');});
   $('testOpenRouter')?.addEventListener('click',async()=>{const r=await chrome.runtime.sendMessage({type:'subify-test-openrouter'}).catch(e=>({ok:false,error:e.message}));$('keyStatus').textContent=r?.ok?`OpenRouter متصل است • ${r.model||''}`:(r?.error||'اتصال OpenRouter ناموفق بود.');});
   $('testOpenAI')?.addEventListener('click',async()=>{const r=await chrome.runtime.sendMessage({type:'subify-test-openai'}).catch(e=>({ok:false,error:e.message}));$('keyStatus').textContent=r?.ok?`OpenAI متصل است • ${r.model||''}`:(r?.error||'اتصال OpenAI ناموفق بود.');});
+  $('testGisoo')?.addEventListener('click',async()=>{const r=await chrome.runtime.sendMessage({type:'subify-test-gisoo'}).catch(e=>({ok:false,error:e.message}));$('keyStatus').textContent=r?.ok?`Gisoo متصل است • ${r.model||''}`:(r?.error||'اتصال Gisoo ناموفق بود.');});
 })();

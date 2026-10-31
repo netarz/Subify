@@ -13,14 +13,17 @@ const __sby_p = (() => {
 
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
+const GISOO_BASE = "https://gisoo.pro/api/v1";
 
 const DEFAULT_SETTINGS = {
   apiKey: "",
   openRouterKey: "",
   openaiKey: "",
-  subtitleProvider: "auto", // "auto" prefers OpenRouter, then OpenAI, then Gemini when keys exist
+  gisooKey: "",
+  subtitleProvider: "auto", // "auto" prefers OpenRouter, then OpenAI, then Gisoo, then Gemini when keys exist
   openRouterModel: "openrouter/free",
   openaiModel: "gpt-5.6-luna",
+  gisooModel: "gemini-3.1-flash-lite",
   sttModel: "gemini-3.5-flash",
   ttsModel: "gemini-3.1-flash-tts-preview",
   autoVoiceByGender: true,
@@ -84,13 +87,15 @@ async function vocabPut(key,val){const d=await subifyDb();return new Promise((re
 async function vocabList(){const d=await subifyDb();return new Promise(res=>{const st=d.transaction("vocab","readonly").objectStore("vocab"),out=[];st.openCursor().onsuccess=e=>{const c=e.target.result;if(!c)return res(out);out.push({key:String(c.key),value:c.value});c.continue();};});}
 async function enrichWord(settings,word,sentence){
   const prompt=`Translate and explain the vocabulary item for a Persian learner. Return ONLY JSON: {"word":"","meaning":"","example":"","pos":"","level":""}. Word: ${word}\nSentence: ${sentence}\nMeaning must be concise natural Persian. Example must be a short Persian sentence.`;
+  if((settings.subtitleProvider||"auto")==="gisoo" && settings.gisooKey) return JSON.parse(String(await gisooChat(settings,prompt,{label:"vocabulary"})).replace(/```json|```/g,"").trim());
   if((settings.subtitleProvider||"auto")!=="openrouter" && settings.apiKey){
     const model=settings.sttModel||STT_FALLBACKS[0];
     const r=await fetch(`${GEMINI_BASE}/${model}:generateContent?key=${encodeURIComponent(settings.apiKey)}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{temperature:.15,responseMimeType:"application/json"}})});
     const raw=await r.text();if(!r.ok)throw new Error(`Gemini ${r.status}: ${raw.slice(0,220)}`);const d=JSON.parse(raw);return JSON.parse((d.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("").replace(/```json|```/g,"").trim());
   }
   if(settings.openRouterKey){const r=await fetch(`${OPENROUTER_BASE}/chat/completions`,{method:"POST",headers:{Authorization:`Bearer ${settings.openRouterKey}`,"Content-Type":"application/json","X-Title":"subify vocabulary"},body:JSON.stringify({model:settings.openRouterModel||"openrouter/free",messages:[{role:"user",content:prompt}],temperature:.15})});const raw=await r.text();if(!r.ok)throw new Error(`OpenRouter ${r.status}: ${raw.slice(0,220)}`);const d=JSON.parse(raw);return JSON.parse(String(d.choices?.[0]?.message?.content||"").replace(/```json|```/g,"").trim());}
-  throw new Error("No Gemini or OpenRouter key saved");
+  if(settings.gisooKey) return JSON.parse(String(await gisooChat(settings,prompt,{label:"vocabulary"})).replace(/```json|```/g,"").trim());
+  throw new Error("No Gemini, OpenRouter or Gisoo key saved");
 }
 
 
@@ -466,6 +471,37 @@ async function translateSubtitleCuesOpenRouter(cues, settings) {
 
 
 
+// Gisoo (https://gisoo.pro) is an OpenAI-compatible gateway: the same /chat/completions
+// shape as OpenRouter, one key, base URL https://gisoo.pro/api/v1.
+async function gisooChat(settings, prompt, { temperature = 0.15, maxTokens, label = "subtitles" } = {}) {
+  if (!settings.gisooKey) throw new Error("No Gisoo API key saved");
+  const body = {
+    model: settings.gisooModel || "gemini-3.1-flash-lite",
+    messages: [{ role: "user", content: prompt }],
+    temperature
+  };
+  if (maxTokens) body.max_tokens = maxTokens;
+  const res = await fetch(`${GISOO_BASE}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${settings.gisooKey}`,
+      "Content-Type": "application/json",
+      "X-Title": `subify ${label}`
+    },
+    body: JSON.stringify(body)
+  });
+  const raw = await res.text();
+  if (!res.ok) throw new Error(`Gisoo ${res.status}: ${raw.slice(0, 260)}`);
+  const data = JSON.parse(raw);
+  return data.choices?.[0]?.message?.content || "";
+}
+
+async function translateSubtitleCuesGisoo(cues, settings) {
+  const { prompt } = subtitleItemsAndPrompt(cues);
+  const text = await gisooChat(settings, prompt, { maxTokens: 4096 });
+  return parseSubtitleResults(text, "Gisoo");
+}
+
 async function translateSubtitleCuesOpenAI(cues, settings) {
   if (!settings.openaiKey) throw new Error("No OpenAI API key saved");
   const { prompt } = subtitleItemsAndPrompt(cues);
@@ -504,6 +540,7 @@ async function translateSubtitleCues(cues, settings, model) {
   const provider = settings.subtitleProvider || "auto";
   if (provider === "openrouter") return translateSubtitleCuesOpenRouter(cues, settings);
   if (provider === "openai") return translateSubtitleCuesOpenAI(cues, settings);
+  if (provider === "gisoo") return translateSubtitleCuesGisoo(cues, settings);
   if (provider === "gemini") return translateSubtitleCuesGemini(cues, settings, model);
 
   // Auto: keep Gemini as the first choice, but do not let a Gemini quota error
@@ -518,6 +555,10 @@ async function translateSubtitleCues(cues, settings, model) {
     if (settings.openaiKey && isQuotaOrTransientError(e)) {
       await log("Gemini subtitle quota/temporary error — switching this batch to OpenAI", "warn");
       return translateSubtitleCuesOpenAI(cues, settings);
+    }
+    if (settings.gisooKey && isQuotaOrTransientError(e)) {
+      await log("Gemini subtitle quota/temporary error — switching this batch to Gisoo", "warn");
+      return translateSubtitleCuesGisoo(cues, settings);
     }
     throw e;
   }
@@ -577,6 +618,12 @@ async function testOpenRouter(settings) {
   const text = String(data.choices?.[0]?.message?.content || "").trim();
   if (!text) throw new Error("OpenRouter accepted the key but returned no text");
   return { ok: true, model: data.model || settings.openRouterModel || "openrouter/free" };
+}
+
+async function testGisoo(settings) {
+  const text = String(await gisooChat(settings, "Reply with exactly: OK", { temperature: 0, label: "key test" })).trim();
+  if (!text) throw new Error("Gisoo accepted the key but returned no text");
+  return { ok: true, model: settings.gisooModel || "gemini-3.1-flash-lite" };
 }
 
 function pickVoice(settings, gender) {
@@ -840,14 +887,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             sendResponse({ ok: true, provider: "openai", results });
             break;
           }
+          if (provider === "gisoo") {
+            if (!settings.gisooKey) throw new Error("Gisoo is selected, but no Gisoo API key is saved");
+            const results = await translateSubtitleCuesGisoo(cues, settings);
+            sendResponse({ ok: true, provider: "gisoo", results });
+            break;
+          }
           if (provider === "gemini" && !settings.apiKey) throw new Error("Gemini انتخاب شده، اما کلید Gemini ذخیره نشده است");
-          if (provider === "auto" && !settings.apiKey && !settings.openRouterKey && !settings.openaiKey) throw new Error("هیچ کلید Gemini، OpenRouter یا OpenAI ذخیره نشده است");
+          if (provider === "auto" && !settings.apiKey && !settings.openRouterKey && !settings.openaiKey && !settings.gisooKey) throw new Error("هیچ کلید Gemini، OpenRouter، OpenAI یا Gisoo ذخیره نشده است");
           let results, usedProvider;
           if (provider === "auto") {
             // Auto deliberately does NOT prefer Gemini. Use the explicitly configured
             // alternatives first, then fall back to Gemini when it is the only/last option.
             if (settings.openRouterKey) { results = await translateSubtitleCuesOpenRouter(cues, settings); usedProvider = "openrouter"; }
             else if (settings.openaiKey) { results = await translateSubtitleCuesOpenAI(cues, settings); usedProvider = "openai"; }
+            else if (settings.gisooKey) { results = await translateSubtitleCuesGisoo(cues, settings); usedProvider = "gisoo"; }
             else {
               const chosen = settings.geminiSubtitleModel || settings.sttModel;
               results = await withModelFallback({ ...settings, sttModel: chosen }, "sttModel", [chosen, ...STT_FALLBACKS], (m) => translateSubtitleCues(cues, { ...settings, subtitleProvider: "gemini" }, m));
@@ -889,6 +943,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           sendResponse(result);
         } catch (e) {
           await log("OpenAI key test failed: " + (e.message || e), "error");
+          sendResponse({ ok: false, error: String(e.message || e) });
+        }
+        break;
+      }
+      case "subify-test-gisoo": {
+        try {
+          const settings = await getSettings();
+          const result = await testGisoo(settings);
+          await log(`Gisoo connected — model: ${result.model}`, "ok");
+          sendResponse(result);
+        } catch (e) {
+          await log("Gisoo test failed: " + (e.message || e), "error");
           sendResponse({ ok: false, error: String(e.message || e) });
         }
         break;

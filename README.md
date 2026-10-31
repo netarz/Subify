@@ -123,6 +123,7 @@
 - Google Gemini
 - OpenRouter
 - OpenAI
+- Gisoo (گیسو)
 
 ### 🌍 محتوای چندزبانه
 
@@ -201,6 +202,7 @@
 | Google Gemini | ترجمه و قابلیت‌های زنده هوش مصنوعی |
 | OpenRouter | ترجمه متنی با مدل‌های پشتیبانی‌شده |
 | OpenAI | ترجمه متنی با API اوپن‌ای‌آی |
+| Gisoo | ترجمه متنی از طریق API سازگار با OpenAI در [gisoo.pro](https://gisoo.pro/?utm_source=github&utm_medium=referral&utm_campaign=subify) با یک کلید و بیش از ۴۰۰ مدل؛ کلید را از بخش کلیدها در پاپ‌آپ وارد کن |
 
 > **کلید API خودت را استفاده کن:** سابیفای برای استفاده با اعتبارنامه‌هایی که خود کاربر وارد می‌کند طراحی شده است.
 
