@@ -241,7 +241,7 @@ $("captureShot")?.addEventListener("click",async()=>{const tab=await activeTab()
   function updateProviderUi(v,pd={}){
     const labels={auto:'خودکار',gemini:'Gemini',openrouter:'OpenRouter',openai:'OpenAI',gisoo:'Gisoo'};
     if($('providerBadge'))$('providerBadge').textContent=labels[v]||'خودکار';
-    if($('providerHint'))$('providerHint').textContent=v==='auto'?'خودکار: اول OpenRouter، سپس OpenAI، بعد Gisoo و بعد Gemini؛ فقط سرویسی که کلید دارد استفاده می‌شود.':`موتور انتخاب‌شده: ${labels[v]||v}. فقط همان سرویس برای ترجمه استفاده می‌شود.`;
+    if($('providerHint'))$('providerHint').textContent=v==='auto'?'خودکار: اول OpenRouter، سپس OpenAI و بعد Gemini؛ Gisoo فقط وقتی Gemini خطا بدهد یا سهمیه‌اش تمام شود (یا اگر کلید دیگری نباشد). فقط سرویسی که کلید دارد استفاده می‌شود.':`موتور انتخاب‌شده: ${labels[v]||v}. فقط همان سرویس برای ترجمه استفاده می‌شود.`;
     const input=$('popup-provider-model'), select=$('popup-gemini-models'), hint=$('providerModelHint');
     if(!input||!select)return;
     const isGemini=v==='gemini', isOR=v==='openrouter', isOAI=v==='openai', isGisoo=v==='gisoo';

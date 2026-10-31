@@ -20,7 +20,7 @@ const DEFAULT_SETTINGS = {
   openRouterKey: "",
   openaiKey: "",
   gisooKey: "",
-  subtitleProvider: "auto", // "auto" prefers OpenRouter, then OpenAI, then Gisoo, then Gemini when keys exist
+  subtitleProvider: "auto", // "auto" prefers OpenRouter, then OpenAI, then Gemini; Gisoo takes over only when Gemini fails or runs out of quota (or when it is the only key)
   openRouterModel: "openrouter/free",
   openaiModel: "gpt-5.6-luna",
   gisooModel: "gemini-3.1-flash-lite",
@@ -481,19 +481,39 @@ async function gisooChat(settings, prompt, { temperature = 0.15, maxTokens, labe
     temperature
   };
   if (maxTokens) body.max_tokens = maxTokens;
-  const res = await fetch(`${GISOO_BASE}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${settings.gisooKey}`,
-      "Content-Type": "application/json",
-      "X-Title": `subify ${label}`
-    },
-    body: JSON.stringify(body)
-  });
-  const raw = await res.text();
-  if (!res.ok) throw new Error(`Gisoo ${res.status}: ${raw.slice(0, 260)}`);
-  const data = JSON.parse(raw);
-  return data.choices?.[0]?.message?.content || "";
+  // A hung request must not stall the subtitle queue: 45 s per try, and one retry
+  // for a timeout, a network error, 429 or 5xx. Anything else (bad key, no credit) fails at once.
+  let lastError;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 45000);
+    try {
+      const res = await fetch(`${GISOO_BASE}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${settings.gisooKey}`,
+          "Content-Type": "application/json",
+          "X-Title": `subify ${label}`
+        },
+        body: JSON.stringify(body),
+        signal: ctrl.signal
+      });
+      const raw = await res.text();
+      if (!res.ok) {
+        lastError = new Error(`Gisoo ${res.status}: ${raw.slice(0, 260)}`);
+        if (res.status === 429 || res.status >= 500) { await new Promise(r => setTimeout(r, 800)); continue; }
+        throw lastError;
+      }
+      const data = JSON.parse(raw);
+      return data.choices?.[0]?.message?.content || "";
+    } catch (e) {
+      if (e === lastError) throw e;
+      lastError = new Error(e?.name === "AbortError" ? "Gisoo request timed out (45s)" : `Gisoo network error: ${e?.message || e}`);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw lastError;
 }
 
 async function translateSubtitleCuesGisoo(cues, settings) {
@@ -901,11 +921,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             // alternatives first, then fall back to Gemini when it is the only/last option.
             if (settings.openRouterKey) { results = await translateSubtitleCuesOpenRouter(cues, settings); usedProvider = "openrouter"; }
             else if (settings.openaiKey) { results = await translateSubtitleCuesOpenAI(cues, settings); usedProvider = "openai"; }
-            else if (settings.gisooKey) { results = await translateSubtitleCuesGisoo(cues, settings); usedProvider = "gisoo"; }
+            else if (!settings.apiKey && settings.gisooKey) { results = await translateSubtitleCuesGisoo(cues, settings); usedProvider = "gisoo"; }
             else {
               const chosen = settings.geminiSubtitleModel || settings.sttModel;
-              results = await withModelFallback({ ...settings, sttModel: chosen }, "sttModel", [chosen, ...STT_FALLBACKS], (m) => translateSubtitleCues(cues, { ...settings, subtitleProvider: "gemini" }, m));
-              usedProvider = "gemini";
+              try {
+                results = await withModelFallback({ ...settings, sttModel: chosen }, "sttModel", [chosen, ...STT_FALLBACKS], (m) => translateSubtitleCues(cues, { ...settings, subtitleProvider: "gemini" }, m));
+                usedProvider = "gemini";
+              } catch (e) {
+                // Gisoo is only a fallback here: Gemini errored or ran out of quota.
+                if (!settings.gisooKey || !isQuotaOrTransientError(e)) throw e;
+                await log("Gemini subtitle quota/temporary error — switching this batch to Gisoo", "warn");
+                results = await translateSubtitleCuesGisoo(cues, settings);
+                usedProvider = "gisoo";
+              }
             }
           } else {
             if (provider === "gemini") {

@@ -216,6 +216,7 @@ Subify follows a **local-first** approach.
 - API keys entered by the user are stored in the extension settings.
 - AI requests are sent using the service and credentials configured by the user.
 - Vocabulary-learning data is stored locally in the browser.
+- **When Gisoo is active** (selected manually, or a Gisoo key is saved and Gemini failed or ran out of quota), the subtitle text and the words you pick for explanation are sent to `gisoo.pro`. Without a Gisoo key, or while another provider is in use, nothing is sent to `gisoo.pro`. The same applies to Gemini, OpenRouter and OpenAI: the text goes to whichever service handles the request.
 
 Subify is designed to give users more control over the services and credentials they use.
 
